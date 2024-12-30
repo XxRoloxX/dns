@@ -32,9 +32,9 @@ func (d *Decoder) Decode(message *Message) error {
 		return err
 	}
 
-	message.header = *header
-	message.queries = queries
-	message.answers = answers
+	message.Header = *header
+	message.Queries = queries
+	message.Answers = answers
 
 	return nil
 
@@ -46,7 +46,7 @@ func (d *Decoder) decodeBody(header *Header) ([]Query, []Answer, error) {
 	queries := make([]Query, 0)
 	answers := make([]Answer, 0)
 
-	for _ = range header.numberOfQuestions {
+	for _ = range header.NumberOfQuestions {
 		query, read, err := d.decodeQuery(d.buf[index:])
 		if err != nil {
 			return nil, nil, err
@@ -56,7 +56,7 @@ func (d *Decoder) decodeBody(header *Header) ([]Query, []Answer, error) {
 		index += read
 	}
 
-	for _ = range header.numberOfAnswers {
+	for _ = range header.NumberOfAnswers {
 		answer, read, err := d.decodeAnswer(index)
 		if err != nil {
 			return nil, nil, err
@@ -87,12 +87,12 @@ func (d *Decoder) decodeAnswer(index uint16) (*Answer, uint16, error) {
 	rData := d.buf[index+10 : index+10+rDataLength]
 
 	return &Answer{
-		groups:      name,
-		t:           t,
-		class:       class,
-		ttl:         ttl,
-		rDataLength: rDataLength,
-		rData:       rData,
+		Name:                name,
+		ResourceRecordType:  t,
+		ResourceRecordClass: class,
+		Ttl:                 ttl,
+		RDataLength:         rDataLength,
+		RData:               rData,
 	}, index + 10 + rDataLength, nil
 
 }
@@ -208,9 +208,9 @@ func (d *Decoder) decodeQuery(buf []byte) (*Query, uint16, error) {
 	}
 
 	return &Query{
-		groups: groups,
-		t:      t,
-		class:  class,
+		Name:                groups,
+		ResourceRecordType:  t,
+		ResourceRecordClass: class,
 	}, index + 4, nil
 
 }
@@ -232,12 +232,12 @@ func (d *Decoder) decodeHeader() (*Header, error) {
 	numberOfAdditionalRR := binary.BigEndian.Uint16(d.buf[10:12])
 
 	return &Header{
-		transactionId:        transactionId,
-		flags:                *flags,
-		numberOfAuthorityRR:  numberOfAuthorityRR,
-		numberOfAnswers:      numberOfAnswers,
-		numberOfAdditionalRR: numberOfAdditionalRR,
-		numberOfQuestions:    numberOfQuestions,
+		TransactionId:        transactionId,
+		Flags:                *flags,
+		NumberOfAuthorityRR:  numberOfAuthorityRR,
+		NumberOfAnswers:      numberOfAnswers,
+		NumberOfAdditionalRR: numberOfAdditionalRR,
+		NumberOfQuestions:    numberOfQuestions,
 	}, nil
 }
 
@@ -268,13 +268,13 @@ func (d *Decoder) decodeHeaderFlags(buf []byte) (*HeaderFlags, error) {
 	}
 
 	flags := HeaderFlags{
-		query:              query,
-		operationCode:      opcode,
-		authorativeAnswer:  authorative,
-		truncation:         truncated,
-		recursionDesired:   recursionDesired,
-		recursionAvailable: recursionAvailable,
-		responseCode:       responseCode,
+		Query:              query,
+		OperationCode:      opcode,
+		AuthorativeAnswer:  authorative,
+		Truncation:         truncated,
+		RecursionDesired:   recursionDesired,
+		RecursionAvailable: recursionAvailable,
+		ResponseCode:       responseCode,
 	}
 
 	return &flags, nil

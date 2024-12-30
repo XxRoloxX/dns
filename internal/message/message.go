@@ -53,21 +53,21 @@ func NewResponseCode(code uint16) (ResponseCode, error) {
 type ResourceRecordType uint
 
 const (
-	ResourceRecordType__A    = 0
-	ResourceRecordType__AAAA = 1
-	ResourceRecordType__MX   = 2
-	ResourceRecordType__TXT  = 3
+	ResourceRecordType__A    = 1
+	ResourceRecordType__AAAA = 2
+	ResourceRecordType__MX   = 3
+	ResourceRecordType__TXT  = 4
 )
 
 func NewResourceRecordType(code uint16) (ResourceRecordType, error) {
 	switch code {
-	case 0:
-		return ResourceRecordType__A, nil
 	case 1:
-		return ResourceRecordType__AAAA, nil
+		return ResourceRecordType__A, nil
 	case 2:
-		return ResourceRecordType__MX, nil
+		return ResourceRecordType__AAAA, nil
 	case 3:
+		return ResourceRecordType__MX, nil
+	case 4:
 		return ResourceRecordType__TXT, nil
 	default:
 		return 0, errors.New("Invalid resource record type code")
@@ -93,41 +93,41 @@ func NewResourceRecordClass(code uint16) (ResourceRecordClass, error) {
 }
 
 type HeaderFlags struct {
-	query              bool
-	operationCode      OpCode
-	authorativeAnswer  bool
-	truncation         bool
-	recursionDesired   bool
-	recursionAvailable bool
-	responseCode       ResponseCode
+	Query              bool
+	OperationCode      OpCode
+	AuthorativeAnswer  bool
+	Truncation         bool
+	RecursionDesired   bool
+	RecursionAvailable bool
+	ResponseCode       ResponseCode
 }
 
 type Header struct {
-	transactionId        uint16
-	flags                HeaderFlags
-	numberOfQuestions    uint16
-	numberOfAnswers      uint16
-	numberOfAuthorityRR  uint16
-	numberOfAdditionalRR uint16
+	TransactionId        uint16
+	Flags                HeaderFlags
+	NumberOfQuestions    uint16
+	NumberOfAnswers      uint16
+	NumberOfAuthorityRR  uint16
+	NumberOfAdditionalRR uint16
 }
 
 type Query struct {
-	groups []string
-	t      ResourceRecordType
-	class  ResourceRecordClass
+	Name                []string
+	ResourceRecordType  ResourceRecordType
+	ResourceRecordClass ResourceRecordClass
 }
 
 type Answer struct {
-	groups      []string
-	t           ResourceRecordType
-	class       ResourceRecordClass
-	ttl         uint32
-	rDataLength uint16
-	rData       []byte
+	Name                []string
+	ResourceRecordType  ResourceRecordType
+	ResourceRecordClass ResourceRecordClass
+	Ttl                 uint32
+	RDataLength         uint16
+	RData               []byte
 }
 
 type Message struct {
-	header  Header
-	queries []Query
-	answers []Answer
+	Header  Header
+	Queries []Query
+	Answers []Answer
 }
