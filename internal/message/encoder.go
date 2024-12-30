@@ -24,11 +24,11 @@ func (e *Encoder) Encode(message *Message) []byte {
 	encodedHeader := e.encodeHeader(&message.Header)
 	e.buffer = append(e.buffer, encodedHeader...)
 
-	for _, query := range message.Queries {
+	for _, query := range message.Body.Queries {
 		e.buffer = append(e.buffer, e.encodeQuery(query)...)
 	}
 
-	for _, answer := range message.Answers {
+	for _, answer := range message.Body.Answers {
 		e.buffer = append(e.buffer, e.encodeAnswer(answer)...)
 	}
 

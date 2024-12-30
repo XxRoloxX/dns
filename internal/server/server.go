@@ -67,11 +67,11 @@ func (s *Server) Listen(chan message.Message) {
 		msg.Header.Flags.Query = false
 		msg.Header.NumberOfAnswers = 1
 		msg.Header.NumberOfAuthorityRR = 1
-		msg.Answers = []message.Answer{
+		msg.Body.Answers = []message.Answer{
 			{
-				Name:                msg.Queries[0].Name,
-				ResourceRecordClass: msg.Queries[0].ResourceRecordClass,
-				ResourceRecordType:  msg.Queries[0].ResourceRecordType,
+				Name:                msg.Body.Queries[0].Name,
+				ResourceRecordClass: msg.Body.Queries[0].ResourceRecordClass,
+				ResourceRecordType:  msg.Body.Queries[0].ResourceRecordType,
 				Ttl:                 60,
 				RDataLength:         4,
 				RData:               net.IPv4(192, 168, 1, 1).To4(),

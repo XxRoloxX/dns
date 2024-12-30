@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"log/slog"
 )
 
 type Decoder struct {
@@ -27,29 +26,30 @@ func (d *Decoder) Decode(message *Message) error {
 		return err
 	}
 
-	queries, answers, err := d.decodeBody(header)
+	body, err := d.decodeBody(header)
 	if err != nil {
 		return err
 	}
 
 	message.Header = *header
-	message.Queries = queries
-	message.Answers = answers
+	message.Body = *body
 
 	return nil
 
 }
 
-func (d *Decoder) decodeBody(header *Header) ([]Query, []Answer, error) {
+func (d *Decoder) decodeBody(header *Header) (*MessageBody, error) {
 
 	var index uint16 = 12 // Message header always has 12 bytes
 	queries := make([]Query, 0)
 	answers := make([]Answer, 0)
+	authorative := make([]Answer, 0)
+	additonal := make([]Answer, 0)
 
 	for _ = range header.NumberOfQuestions {
 		query, read, err := d.decodeQuery(d.buf[index:])
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		queries = append(queries, *query)
@@ -57,33 +57,55 @@ func (d *Decoder) decodeBody(header *Header) ([]Query, []Answer, error) {
 	}
 
 	for _ = range header.NumberOfAnswers {
-		answer, read, err := d.decodeAnswer(index)
+		answer, newIndex, err := d.decodeAnswer(index)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		answers = append(answers, *answer)
-		index += read
+		index = newIndex
 	}
 
-	return queries, answers, nil
+	for _ = range header.NumberOfAuthorityRR {
+		answer, newIndex, err := d.decodeAnswer(index)
+		if err != nil {
+			return nil, err
+		}
+
+		authorative = append(authorative, *answer)
+		index = newIndex
+	}
+
+	for _ = range header.NumberOfAdditionalRR {
+		answer, newIndex, err := d.decodeAnswer(index)
+		if err != nil {
+			return nil, err
+		}
+
+		additonal = append(additonal, *answer)
+		index = newIndex
+	}
+
+	return &MessageBody{
+		Queries:     queries,
+		Answers:     answers,
+		Authorative: authorative,
+		Additional:  additonal,
+	}, nil
 }
 
 func (d *Decoder) decodeAnswer(index uint16) (*Answer, uint16, error) {
-
-	slog.Info("Index to decode answers", "idx", index)
 
 	name, index, err := d.decodeNameWithPointers(index)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	slog.Info("New index", "idx", index)
-
 	t, err := NewResourceRecordType(binary.BigEndian.Uint16(d.buf[index : index+2]))
 	class, err := NewResourceRecordClass(binary.BigEndian.Uint16(d.buf[index+2 : index+4]))
 	ttl := binary.BigEndian.Uint32(d.buf[index+4 : index+8])
 	rDataLength := binary.BigEndian.Uint16(d.buf[index+8 : index+10])
+
 	rData := d.buf[index+10 : index+10+rDataLength]
 
 	return &Answer{

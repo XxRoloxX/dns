@@ -126,8 +126,14 @@ type Answer struct {
 	RData               []byte
 }
 
+type MessageBody struct {
+	Queries     []Query
+	Answers     []Answer
+	Authorative []Answer
+	Additional  []Answer
+}
+
 type Message struct {
-	Header  Header
-	Queries []Query
-	Answers []Answer
+	Header Header
+	Body   MessageBody
 }

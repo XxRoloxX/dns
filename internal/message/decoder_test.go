@@ -109,7 +109,7 @@ func TestDecoder_decodeBody(t *testing.T) {
 				NumberOfAnswers:   1,
 			}
 
-			query, answers, err := NewDecoder(tc.rawQuery).decodeBody(&header)
+			body, err := NewDecoder(tc.rawQuery).decodeBody(&header)
 			if err != nil && tc.expectedErr != nil {
 				assert.Equal(t, tc.expectedErr, err)
 				return
@@ -117,8 +117,8 @@ func TestDecoder_decodeBody(t *testing.T) {
 
 			assert.NoError(t, err)
 
-			assert.Equal(t, tc.expectedQueries, query)
-			assert.Equal(t, tc.expectedAnswers, answers)
+			assert.Equal(t, tc.expectedQueries, body.Queries)
+			assert.Equal(t, tc.expectedAnswers, body.Answers)
 		})
 	}
 }
