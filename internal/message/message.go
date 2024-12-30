@@ -118,10 +118,12 @@ type Query struct {
 }
 
 type Answer struct {
-	Query
-	ttl        uint16
-	dataLength uint16
-	data       []byte
+	groups      []string
+	t           ResourceRecordType
+	class       ResourceRecordClass
+	ttl         uint32
+	rDataLength uint16
+	rData       []byte
 }
 
 type Message struct {

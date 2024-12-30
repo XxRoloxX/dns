@@ -1,17 +1,13 @@
 package message
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
-
-	"github.com/stretchr/testify/assert"
+	"log/slog"
 )
 
 type Decoder struct {
-	// reader io.Reader
 	buf []byte
 }
 
@@ -21,6 +17,9 @@ func NewDecoder(buf []byte) *Decoder {
 	}
 }
 
+func (d *Decoder) isIndexValid(index uint16) bool {
+	return uint16(len(d.buf)) > index
+}
 func (d *Decoder) Decode(message *Message) error {
 
 	header, err := d.decodeHeader()
@@ -28,13 +27,14 @@ func (d *Decoder) Decode(message *Message) error {
 		return err
 	}
 
-	queries, err := d.decodeBody(header)
+	queries, answers, err := d.decodeBody(header)
 	if err != nil {
 		return err
 	}
 
 	message.header = *header
 	message.queries = queries
+	message.answers = answers
 
 	return nil
 
@@ -42,19 +42,12 @@ func (d *Decoder) Decode(message *Message) error {
 
 func (d *Decoder) decodeBody(header *Header) ([]Query, []Answer, error) {
 
-	index := 0
+	var index uint16 = 12 // Message header always has 12 bytes
 	queries := make([]Query, 0)
 	answers := make([]Answer, 0)
 
-	buf := make([]byte, 500)
-
-	_, err := d.reader.Read(buf)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	for _ = range header.numberOfQuestions {
-		query, read, err := d.decodeQuery(buf[index:])
+		query, read, err := d.decodeQuery(d.buf[index:])
 		if err != nil {
 			return nil, nil, err
 		}
@@ -64,7 +57,7 @@ func (d *Decoder) decodeBody(header *Header) ([]Query, []Answer, error) {
 	}
 
 	for _ = range header.numberOfAnswers {
-		answer, read, err := d.decodeAnswer(buf[index:])
+		answer, read, err := d.decodeAnswer(index)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -76,40 +69,84 @@ func (d *Decoder) decodeBody(header *Header) ([]Query, []Answer, error) {
 	return queries, answers, nil
 }
 
-func (d *Decoder) decodeAnswer(index int) (*Answer, int, error) {
-	isPointer := d.isPoinerToDomain(d.buf[index])
+func (d *Decoder) decodeAnswer(index uint16) (*Answer, uint16, error) {
 
-	if isPointer {
-		pointer := d.pointerFrom([2]byte{d.buf[index], d.buf[index+1]})
+	slog.Info("Index to decode answers", "idx", index)
 
+	name, index, err := d.decodeNameWithPointers(index)
+	if err != nil {
+		return nil, 0, err
 	}
+
+	slog.Info("New index", "idx", index)
+
+	t, err := NewResourceRecordType(binary.BigEndian.Uint16(d.buf[index : index+2]))
+	class, err := NewResourceRecordClass(binary.BigEndian.Uint16(d.buf[index+2 : index+4]))
+	ttl := binary.BigEndian.Uint32(d.buf[index+4 : index+8])
+	rDataLength := binary.BigEndian.Uint16(d.buf[index+8 : index+10])
+	rData := d.buf[index+10 : index+10+rDataLength]
+
+	return &Answer{
+		groups:      name,
+		t:           t,
+		class:       class,
+		ttl:         ttl,
+		rDataLength: rDataLength,
+		rData:       rData,
+	}, index + 10 + rDataLength, nil
+
 }
 
-func (d *Decoder) decodeNameRecursively(index uint16, groups []string) ([]string, error) {
+func (d *Decoder) decodeNameWithPointers(index uint16) ([]string, uint16, error) {
 
-	//copy the groups array
-	groups = make([]string, len(groups), 0)
-	for _, group := range groups {
-		groups = append(groups, group)
+	if !d.isIndexValid(index) {
+		return nil, 0, errors.New(fmt.Sprintf("Invalid index: %d", index))
 	}
 
+	groupLength := uint8(d.buf[index])
+	isPointer := d.isPoinerToDomain(groupLength)
+
+	if !isPointer {
+		return d.decodeNameWithoutPointers(index)
+	}
+
+	pointer := d.pointerFrom([2]byte{d.buf[index], d.buf[index+1]})
+
+	if !d.isIndexValid(pointer) {
+		return nil, 0, errors.New(fmt.Sprintf("Invalid pointer: %d", pointer))
+	}
+
+	name, _, err := d.decodeNameWithoutPointers(pointer)
+
+	// New index is +2 because of 2 bytes for pointer
+	return name, index + 2, err
+}
+
+func (d *Decoder) decodeNameWithoutPointers(index uint16) ([]string, uint16, error) {
+
+	if !d.isIndexValid(index) {
+		return nil, 0, errors.New(fmt.Sprintf("Invalid index: %d", index))
+	}
+
+	groups := make([]string, 0)
+
 	for {
+
 		groupLength := uint8(d.buf[index])
 
 		isTerminated := d.isNameTerminated(groupLength)
 		if isTerminated {
-			return groups, nil
+			return groups, index + 1, nil
 		}
 
-		isPointer := d.isPoinerToDomain(groupLength)
-
-		if isPointer {
-			pointer := d.pointerFrom([2]byte{d.buf[index], d.buf[index+1]})
-			return d.decodeNameRecursively(pointer, groups)
-		}
-
-		if groupLength >= uint8(len(d.buf)) {
-			return nil, errors.New(fmt.Sprintf("Invalid group length: Expected %d, got %d", d.buf, groupLength))
+		if !d.isIndexValid(uint16(groupLength) + index + 1) {
+			return nil,
+				0,
+				errors.New(
+					fmt.Sprintf(
+						"Invalid group length: Expected < %d, got %d",
+						len(d.buf),
+						index+1+uint16(groupLength)))
 		}
 
 		// Get bytes as group after the group length byte
@@ -131,12 +168,12 @@ func (d *Decoder) pointerFrom(b [2]byte) uint16 {
 }
 
 func (d *Decoder) isNameTerminated(b byte) bool {
-	return b == 0 // 110000 -> marks a start of an pointer
+	return b == 0 // 00000000 -> marks termination
 }
 
-func (d *Decoder) decodeQuery(buf []byte) (*Query, int, error) {
+func (d *Decoder) decodeQuery(buf []byte) (*Query, uint16, error) {
 
-	index := 0
+	var index uint16 = 0
 	groups := make([]string, 0)
 
 	for {
@@ -153,10 +190,10 @@ func (d *Decoder) decodeQuery(buf []byte) (*Query, int, error) {
 		}
 
 		// Get bytes as group after the group length byte
-		group := buf[index+1 : index+int(groupLength)+1]
+		group := buf[index+1 : index+uint16(groupLength)+1]
 		groups = append(groups, string(group))
 
-		index += int(groupLength) + 1
+		index += uint16(groupLength) + 1
 	}
 
 	t, err := NewResourceRecordType(binary.BigEndian.Uint16(buf[index : index+2]))
