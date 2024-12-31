@@ -42,7 +42,7 @@ func (s *Server) HandleMessage(rawMessage []byte) {
 		return
 	}
 
-	slog.Info("Got message", "msg", fmt.Sprintf("%+v", decodedMessage))
+	// slog.Info("Got message", "msg", fmt.Sprintf("%+v", decodedMessage))
 }
 
 func (s *Server) Listen(chan message.Message) {

@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log/slog"
 )
 
 type Decoder struct {
@@ -119,47 +120,68 @@ func (d *Decoder) decodeAnswer(index uint16) (*Answer, uint16, error) {
 
 }
 
+// func (d *Decoder) decodeNameWithPointers(index uint16) ([]string, uint16, error) {
+//
+// 	if !d.isIndexValid(index) {
+// 		return nil, 0, errors.New(fmt.Sprintf("Invalid index: %d", index))
+// 	}
+//
+// 	groupLength := uint8(d.buf[index])
+// 	isPointer := d.isPoinerToDomain(groupLength)
+//
+// 	if !isPointer {
+// 		return d.decodeNameWithoutPointers(index)
+// 	}
+//
+// 	pointer := d.pointerFrom([2]byte{d.buf[index], d.buf[index+1]})
+//
+// 	slog.Info(
+// 		"Decoding pointer",
+// 		"idx", index,
+// 		"pointer", pointer,
+// 		"to", fmt.Sprintf("%b", d.buf[pointer:pointer+10]),
+// 	)
+//
+// 	if !d.isIndexValid(pointer) {
+// 		return nil, 0, errors.New(fmt.Sprintf("Invalid pointer: %d", pointer))
+// 	}
+//
+// 	name, _, err := d.decodeNameWithoutPointers(pointer)
+//
+// 	// New index is +2 because of 2 bytes for pointer
+// 	return name, index + 2, err
+// }
+
 func (d *Decoder) decodeNameWithPointers(index uint16) ([]string, uint16, error) {
 
 	if !d.isIndexValid(index) {
 		return nil, 0, errors.New(fmt.Sprintf("Invalid index: %d", index))
 	}
 
-	groupLength := uint8(d.buf[index])
-	isPointer := d.isPoinerToDomain(groupLength)
-
-	if !isPointer {
-		return d.decodeNameWithoutPointers(index)
-	}
-
-	pointer := d.pointerFrom([2]byte{d.buf[index], d.buf[index+1]})
-
-	if !d.isIndexValid(pointer) {
-		return nil, 0, errors.New(fmt.Sprintf("Invalid pointer: %d", pointer))
-	}
-
-	name, _, err := d.decodeNameWithoutPointers(pointer)
-
-	// New index is +2 because of 2 bytes for pointer
-	return name, index + 2, err
-}
-
-func (d *Decoder) decodeNameWithoutPointers(index uint16) ([]string, uint16, error) {
-
-	if !d.isIndexValid(index) {
-		return nil, 0, errors.New(fmt.Sprintf("Invalid index: %d", index))
-	}
-
 	groups := make([]string, 0)
+	nameEndsAt := index
+	wasPointerUsed := false
 
 	for {
 
-		groupLength := uint8(d.buf[index])
+		initialByte := uint8(d.buf[index])
 
-		isTerminated := d.isNameTerminated(groupLength)
+		isTerminated := d.isNameTerminated(initialByte)
 		if isTerminated {
-			return groups, index + 1, nil
+			slog.Info("NAME", "name", groups, "endsAt", nameEndsAt)
+			return groups, nameEndsAt + 2, nil
 		}
+
+		isPointer := d.isPoinerToDomain(initialByte)
+		if isPointer {
+			pointer := d.pointerFrom(index)
+
+			// Assign current index to pointer
+			index = pointer
+			wasPointerUsed = true
+		}
+
+		groupLength := uint8(d.buf[index])
 
 		if !d.isIndexValid(uint16(groupLength) + index + 1) {
 			return nil,
@@ -176,17 +198,20 @@ func (d *Decoder) decodeNameWithoutPointers(index uint16) ([]string, uint16, err
 		groups = append(groups, string(group))
 
 		index += uint16(groupLength) + 1
-	}
 
+		if !wasPointerUsed {
+			nameEndsAt = index
+		}
+	}
 }
 
 func (d *Decoder) isPoinerToDomain(b byte) bool {
 	return (b&128 > 0) && (b&64 > 0) // 110000 -> marks a start of an pointer
 }
 
-func (d *Decoder) pointerFrom(b [2]byte) uint16 {
+func (d *Decoder) pointerFrom(index uint16) uint16 {
 
-	return binary.BigEndian.Uint16([]byte{b[0] & (63), b[1]})
+	return binary.BigEndian.Uint16([]byte{d.buf[index] & (63), d.buf[index+1]})
 }
 
 func (d *Decoder) isNameTerminated(b byte) bool {
