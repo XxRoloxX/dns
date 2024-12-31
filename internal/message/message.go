@@ -3,6 +3,8 @@ package message
 import (
 	"errors"
 	"fmt"
+
+	"github.com/XxRoloxX/dns/internal/record"
 )
 
 type OpCode uint
@@ -50,48 +52,6 @@ func NewResponseCode(code uint16) (ResponseCode, error) {
 	}
 }
 
-type ResourceRecordType uint
-
-const (
-	ResourceRecordType__A    = 1
-	ResourceRecordType__AAAA = 2
-	ResourceRecordType__MX   = 3
-	ResourceRecordType__TXT  = 4
-)
-
-func NewResourceRecordType(code uint16) (ResourceRecordType, error) {
-	switch code {
-	case 1:
-		return ResourceRecordType__A, nil
-	case 2:
-		return ResourceRecordType__AAAA, nil
-	case 3:
-		return ResourceRecordType__MX, nil
-	case 4:
-		return ResourceRecordType__TXT, nil
-	default:
-		return 0, errors.New("Invalid resource record type code")
-	}
-}
-
-type ResourceRecordClass uint
-
-const (
-	ResourceRecordClass__In     = 1
-	ResourceRecordClass__Review = 256
-)
-
-func NewResourceRecordClass(code uint16) (ResourceRecordClass, error) {
-	switch code {
-	case 1:
-		return ResourceRecordClass__In, nil
-	case 256:
-		return ResourceRecordClass__Review, nil
-	default:
-		return 0, errors.New(fmt.Sprintf("Invalid resource record class code: %d", code))
-	}
-}
-
 type HeaderFlags struct {
 	Query              bool
 	OperationCode      OpCode
@@ -113,14 +73,14 @@ type Header struct {
 
 type Query struct {
 	Name                []string
-	ResourceRecordType  ResourceRecordType
-	ResourceRecordClass ResourceRecordClass
+	ResourceRecordType  record.ResourceRecordType
+	ResourceRecordClass record.ResourceRecordClass
 }
 
 type Answer struct {
 	Name                []string
-	ResourceRecordType  ResourceRecordType
-	ResourceRecordClass ResourceRecordClass
+	ResourceRecordType  record.ResourceRecordType
+	ResourceRecordClass record.ResourceRecordClass
 	Ttl                 uint32
 	RDataLength         uint16
 	RData               []byte
@@ -136,4 +96,51 @@ type MessageBody struct {
 type Message struct {
 	Header Header
 	Body   MessageBody
+}
+
+func (m *Message) SetAsResponse() {
+	m.Header.Flags.Query = false
+}
+
+// Update headers with numbers of Answers, Authorative and Additional RRs
+func (m *Message) UpdateRRNumbers() {
+	m.Header.NumberOfAnswers = uint16(len(m.Body.Answers))
+	m.Header.NumberOfAuthorityRR = uint16(len(m.Body.Authorative))
+	m.Header.NumberOfAdditionalRR = uint16(len(m.Body.Additional))
+}
+
+func (m *Message) AddAnswer(rr record.ResourceRecord) {
+
+	m.Body.Answers = append(m.Body.Answers, Answer{
+		Name:                rr.Name(),
+		ResourceRecordType:  rr.Type(),
+		ResourceRecordClass: rr.Class(),
+		Ttl:                 1080,
+		RDataLength:         uint16(len(rr.Data())),
+		RData:               rr.Data(),
+	})
+}
+
+func (m *Message) AddAuthorative(rr record.ResourceRecord) {
+
+	m.Body.Authorative = append(m.Body.Answers, Answer{
+		Name:                rr.Name(),
+		ResourceRecordType:  rr.Type(),
+		ResourceRecordClass: rr.Class(),
+		Ttl:                 1080,
+		RDataLength:         uint16(len(rr.Data())),
+		RData:               rr.Data(),
+	})
+}
+
+func (m *Message) AddAdditional(rr record.ResourceRecord) {
+
+	m.Body.Additional = append(m.Body.Answers, Answer{
+		Name:                rr.Name(),
+		ResourceRecordType:  rr.Type(),
+		ResourceRecordClass: rr.Class(),
+		Ttl:                 1080,
+		RDataLength:         uint16(len(rr.Data())),
+		RData:               rr.Data(),
+	})
 }

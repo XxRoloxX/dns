@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+
+	"github.com/XxRoloxX/dns/internal/record"
 )
 
 type Decoder struct {
@@ -46,6 +48,9 @@ func (d *Decoder) decodeBody(header *Header) (*MessageBody, error) {
 	answers := make([]Answer, 0)
 	authorative := make([]Answer, 0)
 	additonal := make([]Answer, 0)
+
+	slog.Info("Header", "repr", header)
+	slog.Info("Header", "binary", fmt.Sprintf("%b", d.buf[:100]))
 
 	for _ = range header.NumberOfQuestions {
 		query, read, err := d.decodeQuery(d.buf[index:])
@@ -102,8 +107,8 @@ func (d *Decoder) decodeAnswer(index uint16) (*Answer, uint16, error) {
 		return nil, 0, err
 	}
 
-	t, err := NewResourceRecordType(binary.BigEndian.Uint16(d.buf[index : index+2]))
-	class, err := NewResourceRecordClass(binary.BigEndian.Uint16(d.buf[index+2 : index+4]))
+	t, err := record.NewResourceRecordType(binary.BigEndian.Uint16(d.buf[index : index+2]))
+	class, err := record.NewResourceRecordClass(binary.BigEndian.Uint16(d.buf[index+2 : index+4]))
 	ttl := binary.BigEndian.Uint32(d.buf[index+4 : index+8])
 	rDataLength := binary.BigEndian.Uint16(d.buf[index+8 : index+10])
 
@@ -120,38 +125,6 @@ func (d *Decoder) decodeAnswer(index uint16) (*Answer, uint16, error) {
 
 }
 
-// func (d *Decoder) decodeNameWithPointers(index uint16) ([]string, uint16, error) {
-//
-// 	if !d.isIndexValid(index) {
-// 		return nil, 0, errors.New(fmt.Sprintf("Invalid index: %d", index))
-// 	}
-//
-// 	groupLength := uint8(d.buf[index])
-// 	isPointer := d.isPoinerToDomain(groupLength)
-//
-// 	if !isPointer {
-// 		return d.decodeNameWithoutPointers(index)
-// 	}
-//
-// 	pointer := d.pointerFrom([2]byte{d.buf[index], d.buf[index+1]})
-//
-// 	slog.Info(
-// 		"Decoding pointer",
-// 		"idx", index,
-// 		"pointer", pointer,
-// 		"to", fmt.Sprintf("%b", d.buf[pointer:pointer+10]),
-// 	)
-//
-// 	if !d.isIndexValid(pointer) {
-// 		return nil, 0, errors.New(fmt.Sprintf("Invalid pointer: %d", pointer))
-// 	}
-//
-// 	name, _, err := d.decodeNameWithoutPointers(pointer)
-//
-// 	// New index is +2 because of 2 bytes for pointer
-// 	return name, index + 2, err
-// }
-
 func (d *Decoder) decodeNameWithPointers(index uint16) ([]string, uint16, error) {
 
 	if !d.isIndexValid(index) {
@@ -162,13 +135,19 @@ func (d *Decoder) decodeNameWithPointers(index uint16) ([]string, uint16, error)
 	nameEndsAt := index
 	wasPointerUsed := false
 
+	// In the case of OPT record the name is set to single 0x00 byte (root domain)
+	isRoot := d.isRootDomain(d.buf[index])
+	if isRoot {
+		return groups, nameEndsAt + 1, nil // there is no termination byte in this case
+	}
+
 	for {
 
 		initialByte := uint8(d.buf[index])
 
 		isTerminated := d.isNameTerminated(initialByte)
 		if isTerminated {
-			slog.Info("NAME", "name", groups, "endsAt", nameEndsAt)
+			// slog.Info("NAME", "name", groups, "endsAt", nameEndsAt)
 			return groups, nameEndsAt + 2, nil
 		}
 
@@ -218,6 +197,10 @@ func (d *Decoder) isNameTerminated(b byte) bool {
 	return b == 0 // 00000000 -> marks termination
 }
 
+func (d *Decoder) isRootDomain(b byte) bool {
+	return b == 0 // 00000000 -> root domain -> . used for OPT records
+}
+
 func (d *Decoder) decodeQuery(buf []byte) (*Query, uint16, error) {
 
 	var index uint16 = 0
@@ -243,13 +226,13 @@ func (d *Decoder) decodeQuery(buf []byte) (*Query, uint16, error) {
 		index += uint16(groupLength) + 1
 	}
 
-	t, err := NewResourceRecordType(binary.BigEndian.Uint16(buf[index : index+2]))
+	t, err := record.NewResourceRecordType(binary.BigEndian.Uint16(buf[index : index+2]))
 
 	if err != nil {
 		return nil, index, err
 	}
 
-	class, err := NewResourceRecordClass(binary.BigEndian.Uint16(buf[index+2 : index+4]))
+	class, err := record.NewResourceRecordClass(binary.BigEndian.Uint16(buf[index+2 : index+4]))
 	if err != nil {
 		return nil, index, err
 	}

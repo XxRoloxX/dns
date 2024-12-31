@@ -4,6 +4,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/XxRoloxX/dns/internal/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -67,15 +68,15 @@ func TestEncoder_encodeBody(t *testing.T) {
 			queries: []Query{
 				{
 					Name:                []string{"example", "com"},
-					ResourceRecordType:  ResourceRecordType__A,
-					ResourceRecordClass: ResourceRecordClass__In,
+					ResourceRecordType:  record.ResourceRecordType__A,
+					ResourceRecordClass: record.ResourceRecordClass__In,
 				},
 			},
 			answers: []Answer{
 				{
 					Name:                []string{"example", "com"},
-					ResourceRecordType:  ResourceRecordType__A,
-					ResourceRecordClass: ResourceRecordClass__In,
+					ResourceRecordType:  record.ResourceRecordType__A,
+					ResourceRecordClass: record.ResourceRecordClass__In,
 					Ttl:                 60,
 					RDataLength:         4,
 					RData:               net.IPv4(192, 168, 1, 1).To4(),

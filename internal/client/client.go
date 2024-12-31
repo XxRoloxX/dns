@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/XxRoloxX/dns/internal/message"
+	"github.com/XxRoloxX/dns/internal/record"
 )
 
 type Client struct {
@@ -50,8 +51,8 @@ func (c *Client) QueryATypeRecords(name string) (*message.Message, error) {
 			Queries: []message.Query{
 				{
 					Name:                strings.Split(name, "."),
-					ResourceRecordType:  message.ResourceRecordType__A,
-					ResourceRecordClass: message.ResourceRecordClass__In,
+					ResourceRecordType:  record.ResourceRecordType__A,
+					ResourceRecordClass: record.ResourceRecordClass__In,
 				},
 			},
 		},

@@ -6,10 +6,12 @@ import (
 	"net"
 
 	"github.com/XxRoloxX/dns/internal/message"
+	"github.com/XxRoloxX/dns/internal/record"
 )
 
 type Server struct {
-	conn *net.UDPConn
+	conn  *net.UDPConn
+	store *record.RRStore
 }
 
 func NewServer() *Server {
@@ -27,22 +29,24 @@ func NewServer() *Server {
 	slog.Info("starting to listen on :53")
 
 	return &Server{
-		conn: conn,
+		store: record.NewRRStore(),
+		conn:  conn,
 	}
 }
 
-func (s *Server) HandleMessage(rawMessage []byte) {
+func (s *Server) HandleRequest(req *Request) {
 
-	var decodedMessage message.Message
-	err := message.NewDecoder(rawMessage).Decode(&decodedMessage)
-	if err != nil {
-		slog.Error("failed to decode message ",
-			"err", err.Error(), "msg", fmt.Sprintf("%+v", rawMessage),
-		)
-		return
+	for _, query := range req.msg.Body.Queries {
+		records := s.store.ResourceRecords(query.Name)
+		for _, record := range records {
+			req.msg.AddAnswer(record)
+		}
 	}
 
-	// slog.Info("Got message", "msg", fmt.Sprintf("%+v", decodedMessage))
+	req.msg.SetAsResponse()
+	req.msg.UpdateRRNumbers()
+
+	req.Send()
 }
 
 func (s *Server) Listen(chan message.Message) {
@@ -54,39 +58,11 @@ func (s *Server) Listen(chan message.Message) {
 			slog.Error("failed to read message", "err", err.Error())
 			continue
 		}
-		rawMessage := buf[:n]
 
-		var msg message.Message
+		req, err := NewRequest(s.conn, addr, buf[:n])
 
-		err = message.NewDecoder(rawMessage).Decode(&msg)
-		if err != nil {
-			slog.Error("Failed to decode message", "msg", rawMessage)
-			continue
-		}
+		go s.HandleRequest(req)
 
-		msg.Header.Flags.Query = false
-		msg.Header.NumberOfAnswers = 1
-		msg.Header.NumberOfAuthorityRR = 1
-		msg.Body.Answers = []message.Answer{
-			{
-				Name:                msg.Body.Queries[0].Name,
-				ResourceRecordClass: msg.Body.Queries[0].ResourceRecordClass,
-				ResourceRecordType:  msg.Body.Queries[0].ResourceRecordType,
-				Ttl:                 60,
-				RDataLength:         4,
-				RData:               net.IPv4(192, 168, 1, 1).To4(),
-			},
-		}
-
-		encodedMessage := message.NewEncoder().Encode(&msg)
-
-		_, err = s.conn.WriteToUDP(encodedMessage, addr)
-		if err != nil {
-			slog.Error("Failed to send message", "msg", msg)
-			continue
-		}
-
-		go s.HandleMessage(rawMessage)
 	}
 }
 
