@@ -1,6 +1,6 @@
 package main
 
-import managementserver "github.com/XxRoloxX/dns/internal/management_server"
+import managementserver "github.com/XxRoloxX/dns/pkg/management_server"
 
 func main() {
 

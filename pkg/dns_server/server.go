@@ -2,16 +2,16 @@ package server
 
 import (
 	"fmt"
+	message "github.com/XxRoloxX/dns/pkg/dns_message"
+	managementserver "github.com/XxRoloxX/dns/pkg/management_server"
 	"log/slog"
 	"net"
-
-	message "github.com/XxRoloxX/dns/pkg/dns_message"
-	record "github.com/XxRoloxX/dns/pkg/dns_record"
+	"strings"
 )
 
 type Server struct {
-	conn  *net.UDPConn
-	store *record.RRStore
+	conn       *net.UDPConn
+	repository managementserver.RecordsRepository
 }
 
 func NewServer() *Server {
@@ -28,18 +28,28 @@ func NewServer() *Server {
 
 	slog.Info("starting to listen on :53")
 
+	repository := managementserver.NewPostgresRecordsRepository()
+
 	return &Server{
-		store: record.NewRRStore(),
-		conn:  conn,
+		conn:       conn,
+		repository: repository,
 	}
 }
 
 func (s *Server) HandleRequest(req *Request) {
 
 	for _, query := range req.msg.Body.Queries {
-		records := s.store.ResourceRecords(query.Name)
+		records, err := s.repository.GetRecordsByName(strings.Join(query.Name, "."))
+		if err != nil {
+			slog.Error("Failed to get records for", "query", query)
+		}
 		for _, record := range records {
-			req.msg.AddAnswer(record)
+			rr, err := record.ConvertToResourceRecord()
+			if err != nil {
+				slog.Error("Failed to convert Managed Resource Record to canonical form", "err", err)
+				continue
+			}
+			req.msg.AddAnswer(rr)
 		}
 	}
 
@@ -71,6 +81,6 @@ func (s *Server) Close() {
 	err := s.conn.Close()
 	if err != nil {
 		slog.Error("failed to close server", "err", err.Error())
-		println("Failed to close connection to server")
+		panic("Failed to close connection to server")
 	}
 }

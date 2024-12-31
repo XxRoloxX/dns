@@ -3,7 +3,9 @@ package managementserver
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
+	"strings"
 
 	record "github.com/XxRoloxX/dns/pkg/dns_record"
 	"gorm.io/driver/postgres"
@@ -49,11 +51,26 @@ func ConvertRecordTypeToCode(recordType ManagedDNSRecordType) (uint16, error) {
 // DNS Record Class Enums
 type ManagedDNSRecordClass string
 
+func (c *ManagedDNSRecordClass) ConvertToResourceRecordClass() (record.ResourceRecordClass, error) {
+	switch *c {
+	case ManagedDNSRecordClass_IN:
+		return record.ResourceRecordClass__In, nil
+
+	case ManagedDNSRecordClass_CH:
+		return record.ResourceRecordClass__Ch, nil
+	case ManagedDNSRecordClass_REVIEW:
+		return record.ResourceRecordClass__Review, nil
+	default:
+		return 0, errors.New(fmt.Sprintf("Invalid managed resource record class code: %d", c))
+	}
+}
+
 const (
-	ManagedDNSRecordClass_IN ManagedDNSRecordClass = "IN" // Internet
-	ManagedDNSRecordClass_CS ManagedDNSRecordClass = "CS" // CSNET
-	ManagedDNSRecordClass_CH ManagedDNSRecordClass = "CH" // CHAOS
-	ManagedDNSRecordClass_HS ManagedDNSRecordClass = "HS" // Hesiod
+	ManagedDNSRecordClass_IN     ManagedDNSRecordClass = "IN"     // Internet
+	ManagedDNSRecordClass_CS     ManagedDNSRecordClass = "CS"     // CSNET
+	ManagedDNSRecordClass_CH     ManagedDNSRecordClass = "CH"     // CHAOS
+	ManagedDNSRecordClass_HS     ManagedDNSRecordClass = "HS"     // Hesiod
+	ManagedDNSRecordClass_REVIEW ManagedDNSRecordClass = "REVIEW" // REVIEW
 )
 
 type ManagedDNSResourceRecord struct {
@@ -64,8 +81,48 @@ type ManagedDNSResourceRecord struct {
 	Data  string                `gorm:"not null" json:"data"`
 }
 
+func (r *ManagedDNSResourceRecord) ConvertToResourceRecord() (record.ResourceRecord, error) {
+	names := strings.Split(r.Name, ".")
+
+	class, err := r.Class.ConvertToResourceRecordClass()
+	if err != nil {
+		return nil, err
+	}
+
+	switch r.Type {
+	case ManagedDNSRecordType_A:
+		address := net.ParseIP(r.Data)
+		if address == nil || address.To4() == nil {
+			return nil, errors.New("invalid IPv4 address in Data")
+		}
+		return record.NewARecord(names, class, address), nil
+
+	case ManagedDNSRecordType_AAAA:
+		address := net.ParseIP(r.Data)
+		if address == nil || address.To16() == nil {
+			return nil, errors.New("invalid IPv6 address in Data")
+		}
+
+		return record.NewAAAARecord(names, class, address), nil
+
+	case ManagedDNSRecordType_CNAME:
+		domain := strings.Split(r.Data, ".") // Assuming the domain is comma-separated
+		return record.NewCNAMERecord(names, class, domain), nil
+
+	case ManagedDNSRecordType_TXT:
+		return record.NewTXTRecord(names, class, []byte(r.Data)), nil
+
+	case ManagedDNSRecordType_MX:
+		return record.NewMXRecord(names, class, []byte(r.Data)), nil
+
+	default:
+		return nil, errors.New("unsupported record type")
+	}
+}
+
 type RecordsRepository interface {
 	GetRecords() ([]ManagedDNSResourceRecord, error)
+	GetRecordsByName(name string) ([]ManagedDNSResourceRecord, error)
 	CreateRecord(record *ManagedDNSResourceRecord) error
 	DeleteRecord(id int) error
 }
@@ -77,6 +134,16 @@ type PostgresRecordsRepository struct {
 func (r *PostgresRecordsRepository) GetRecords() ([]ManagedDNSResourceRecord, error) {
 	var records []ManagedDNSResourceRecord
 	if err := r.db.Find(&records).Error; err != nil {
+		return nil, err
+	}
+	return records, nil
+}
+
+func (r *PostgresRecordsRepository) GetRecordsByName(name string) ([]ManagedDNSResourceRecord, error) {
+	var records []ManagedDNSResourceRecord
+	if err := r.db.Find(&records, ManagedDNSResourceRecord{
+		Name: name,
+	}).Error; err != nil {
 		return nil, err
 	}
 	return records, nil
