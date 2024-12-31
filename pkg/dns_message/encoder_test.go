@@ -4,7 +4,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/XxRoloxX/dns/internal/record"
+	"github.com/XxRoloxX/dns/pkg/dns_record"
 	"github.com/stretchr/testify/assert"
 )
 

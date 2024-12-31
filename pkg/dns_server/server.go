@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"net"
 
-	"github.com/XxRoloxX/dns/internal/message"
-	"github.com/XxRoloxX/dns/internal/record"
+	message "github.com/XxRoloxX/dns/pkg/dns_message"
+	record "github.com/XxRoloxX/dns/pkg/dns_record"
 )
 
 type Server struct {

@@ -1,10 +1,9 @@
 package server
 
 import (
+	"github.com/XxRoloxX/dns/pkg/dns_message"
 	"log/slog"
 	"net"
-
-	"github.com/XxRoloxX/dns/internal/message"
 )
 
 type Request struct {

@@ -2,7 +2,7 @@ package message
 
 import (
 	"encoding/binary"
-	bin "github.com/XxRoloxX/dns/pkg/binary"
+	bin "github.com/XxRoloxX/dns/pkg/binary_utils"
 )
 
 func test() {

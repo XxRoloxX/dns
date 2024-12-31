@@ -9,9 +9,9 @@ type RRStore map[string][]ResourceRecord
 
 func NewRRStore() *RRStore {
 	return &RRStore{
-		"dns.test.com": []ResourceRecord{
+		"a.subdomain.rolo-labs.xyz": []ResourceRecord{
 			&ARecord{
-				name:    []string{"dns", "test", "com"},
+				name:    []string{"a", "subdomain", "rolo-labs", "xyz"},
 				class:   ResourceRecordClass__In,
 				address: net.IPv4(8, 8, 8, 8),
 			},

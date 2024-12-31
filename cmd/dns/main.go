@@ -2,8 +2,8 @@ package main
 
 import (
 	// "github.com/XxRoloxX/dns/internal/client"
-	"github.com/XxRoloxX/dns/internal/message"
-	"github.com/XxRoloxX/dns/internal/server"
+	"github.com/XxRoloxX/dns/pkg/dns_message"
+	"github.com/XxRoloxX/dns/pkg/dns_server"
 	// "log/slog"
 )
 

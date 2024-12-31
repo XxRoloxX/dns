@@ -4,7 +4,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/XxRoloxX/dns/internal/record"
+
+	record "github.com/XxRoloxX/dns/pkg/dns_record"
 )
 
 type Decoder struct {

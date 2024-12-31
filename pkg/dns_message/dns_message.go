@@ -4,7 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/XxRoloxX/dns/internal/record"
+	// message "github.com/XxRoloxX/dns/pkg/dns_message"
+	"github.com/XxRoloxX/dns/pkg/dns_record"
 )
 
 type OpCode uint
@@ -119,6 +120,11 @@ func (m *Message) AddAnswer(rr record.ResourceRecord) {
 		RDataLength:         uint16(len(rr.Data())),
 		RData:               rr.Data(),
 	})
+}
+
+func (m *Message) AddQuery(q Query) {
+	m.Body.Queries = append(m.Body.Queries, q)
+	m.Header.NumberOfQuestions++
 }
 
 func (m *Message) AddAuthorative(rr record.ResourceRecord) {

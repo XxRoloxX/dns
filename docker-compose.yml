@@ -1,7 +1,7 @@
 services:
   go-dns:
     container_name: go-dns
-    # image: magpiemonitor/dns
+    image: magpiemonitor/dns
     build: .
     ports:
       - "53:53/udp"
