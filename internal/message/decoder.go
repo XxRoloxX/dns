@@ -4,8 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"log/slog"
-
 	"github.com/XxRoloxX/dns/internal/record"
 )
 
@@ -48,9 +46,6 @@ func (d *Decoder) decodeBody(header *Header) (*MessageBody, error) {
 	answers := make([]Answer, 0)
 	authorative := make([]Answer, 0)
 	additonal := make([]Answer, 0)
-
-	slog.Info("Header", "repr", header)
-	slog.Info("Header", "binary", fmt.Sprintf("%b", d.buf[:100]))
 
 	for _ = range header.NumberOfQuestions {
 		query, read, err := d.decodeQuery(d.buf[index:])

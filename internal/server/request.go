@@ -23,6 +23,8 @@ func NewRequest(conn *net.UDPConn, addr *net.UDPAddr, buf []byte) (*Request, err
 		return nil, err
 	}
 
+	slog.Info("Got message", "msg", msg)
+
 	return &Request{
 		conn: conn,
 		addr: addr,
@@ -39,6 +41,8 @@ func (r *Request) Send() error {
 		slog.Error("Failed to send message", "msg", r.msg)
 		return err
 	}
+
+	slog.Info("Response", "msg", r.msg)
 
 	return nil
 }
