@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-
 	record "github.com/XxRoloxX/dns/pkg/dns_record"
 )
 
@@ -108,6 +107,10 @@ func (d *Decoder) decodeAnswer(index uint16) (*Answer, uint16, error) {
 	ttl := binary.BigEndian.Uint32(d.buf[index+4 : index+8])
 	rDataLength := binary.BigEndian.Uint16(d.buf[index+8 : index+10])
 
+	if !d.isIndexValid(index + 10 + rDataLength - 1) {
+		return nil, 0, errors.New("failed to decode answer section")
+	}
+
 	rData := d.buf[index+10 : index+10+rDataLength]
 
 	return &Answer{
@@ -131,20 +134,21 @@ func (d *Decoder) decodeNameWithPointers(index uint16) ([]string, uint16, error)
 	nameEndsAt := index
 	wasPointerUsed := false
 
-	// In the case of OPT record the name is set to single 0x00 byte (root domain)
-	isRoot := d.isRootDomain(d.buf[index])
-	if isRoot {
-		return groups, nameEndsAt + 1, nil // there is no termination byte in this case
-	}
-
 	for {
 
 		initialByte := uint8(d.buf[index])
 
 		isTerminated := d.isNameTerminated(initialByte)
-		if isTerminated {
-			// slog.Info("NAME", "name", groups, "endsAt", nameEndsAt)
+		if isTerminated && wasPointerUsed {
+
+			// Skip pointer (2 bytes)
 			return groups, nameEndsAt + 2, nil
+		}
+
+		if isTerminated && !wasPointerUsed {
+
+			// Skip termination byte
+			return groups, nameEndsAt + 1, nil
 		}
 
 		isPointer := d.isPoinerToDomain(initialByte)
@@ -158,7 +162,7 @@ func (d *Decoder) decodeNameWithPointers(index uint16) ([]string, uint16, error)
 
 		groupLength := uint8(d.buf[index])
 
-		if !d.isIndexValid(uint16(groupLength) + index + 1) {
+		if !d.isIndexValid(index + 1 + uint16(groupLength)) {
 			return nil,
 				0,
 				errors.New(

@@ -54,24 +54,25 @@ func toBinaryArray(value uint8) []bool {
 
 func (s *BitSetter) SetRange(startIndex uint8, endIndex uint8, value uint8) {
 
-	index := startIndex
+	// To prevent underflow
+	var index int = int(endIndex)
 
 	valueBits := toBinaryArray(value)
 
-	valueBitIndex := 0
+	valueBitIndex := len(valueBits) - 1
 
-	for index <= endIndex {
+	for index >= int(startIndex) {
 
-		if valueBitIndex >= len(valueBits) {
+		if valueBitIndex < 0 {
 
 			// Pad with zeros
-			s.Set(index, false)
-			index++
+			s.Set(uint8(index), false)
+			index--
 			continue
 		}
 
-		s.Set(index, valueBits[valueBitIndex])
-		index++
-		valueBitIndex++
+		s.Set(uint8(index), valueBits[valueBitIndex])
+		index--
+		valueBitIndex--
 	}
 }

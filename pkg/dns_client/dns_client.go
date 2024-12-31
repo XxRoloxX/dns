@@ -117,7 +117,7 @@ func (c *Client) readFromConnection(conn *net.UDPConn) ([]byte, error) {
 			break
 		}
 
-		slog.Info(fmt.Sprintf("Read %s bytes from the dns server", n))
+		slog.Info(fmt.Sprintf("Read %d bytes from the dns server", n))
 	}
 
 	return fullResponse, nil

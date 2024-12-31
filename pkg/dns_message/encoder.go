@@ -50,7 +50,7 @@ func (e *Encoder) encodeHeaderFlags(headerFlags *HeaderFlags) []byte {
 
 	flagsSecondBitSetter := bin.NewBitSetter(flags[1])
 	flagsSecondBitSetter.Set(0, headerFlags.RecursionAvailable)
-	flagsFirstBitSetter.SetRange(4, 7, uint8(headerFlags.ResponseCode))
+	flagsSecondBitSetter.SetRange(4, 7, uint8(headerFlags.ResponseCode))
 	flags[1] = flagsSecondBitSetter.Byte()
 
 	return flags

@@ -103,6 +103,10 @@ func (m *Message) SetAsResponse() {
 	m.Header.Flags.Query = false
 }
 
+func (m *Message) SetResponseCode(code ResponseCode) {
+	m.Header.Flags.ResponseCode = code
+}
+
 // Update headers with numbers of Answers, Authorative and Additional RRs
 func (m *Message) UpdateRRNumbers() {
 	m.Header.NumberOfAnswers = uint16(len(m.Body.Answers))

@@ -136,7 +136,7 @@ func TestDecoder_decodeHeader(t *testing.T) {
 			name: "A message for example.com should be decoded into single query",
 			rawQuery: []byte{
 				0b00011010, 0b00101011, // Transaction ID
-				0b00000001, 0b00000000, // Flags
+				0b00000001, 0b00000011, // Flags
 				0b00000000, 0b00000001, // Questions
 				0b00000000, 0b00000000, // Answer RRs
 				0b00000000, 0b00000000, // Authority RRs
@@ -151,6 +151,7 @@ func TestDecoder_decodeHeader(t *testing.T) {
 					Truncation:         false,
 					RecursionDesired:   true,
 					RecursionAvailable: false,
+					ResponseCode:       ResponseCode__NxDomain,
 				},
 				NumberOfQuestions:    1,
 				NumberOfAnswers:      0,

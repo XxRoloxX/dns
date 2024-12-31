@@ -18,15 +18,15 @@ func NewServer() *Server {
 
 	address, err := net.ResolveUDPAddr("udp", ":53")
 	if err != nil {
-		panic(fmt.Sprintf("Failed to resolve address: %s", err.Error()))
+		panic(fmt.Sprintf("failed to resolve address: %s", err.Error()))
 	}
 
 	conn, err := net.ListenUDP("udp", address)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to listen on socket: %s", err.Error()))
+		panic(fmt.Sprintf("failed to listen on socket: %s", err.Error()))
 	}
 
-	slog.Info("starting to listen on :53")
+	slog.Info("Listening for DNS messages on :53")
 
 	repository := managementserver.NewPostgresRecordsRepository()
 
@@ -42,12 +42,21 @@ func (s *Server) HandleRequest(req *Request) {
 		records, err := s.repository.GetRecordsByName(strings.Join(query.Name, "."))
 		if err != nil {
 			slog.Error("Failed to get records for", "query", query)
+			s.HandleInternalError(req)
+			return
 		}
+
+		if len(records) == 0 {
+			s.HandleNoResourceError(req)
+			return
+		}
+
 		for _, record := range records {
 			rr, err := record.ConvertToResourceRecord()
 			if err != nil {
 				slog.Error("Failed to convert Managed Resource Record to canonical form", "err", err)
-				continue
+				s.HandleInternalError(req)
+				return
 			}
 			req.msg.AddAnswer(rr)
 		}
@@ -56,6 +65,24 @@ func (s *Server) HandleRequest(req *Request) {
 	req.msg.SetAsResponse()
 	req.msg.UpdateRRNumbers()
 
+	req.Send()
+}
+
+func (s *Server) HandleInternalError(req *Request) {
+	req.msg.SetAsResponse()
+	req.msg.SetResponseCode(message.ResponseCode__ServFail)
+	req.Send()
+}
+
+func (s *Server) HandleFormattingError(req *Request) {
+	req.msg.SetAsResponse()
+	req.msg.SetResponseCode(message.ResponseCode__FormErr)
+	req.Send()
+}
+
+func (s *Server) HandleNoResourceError(req *Request) {
+	req.msg.SetAsResponse()
+	req.msg.SetResponseCode(message.ResponseCode__NxDomain)
 	req.Send()
 }
 
@@ -70,6 +97,14 @@ func (s *Server) Listen(chan message.Message) {
 		}
 
 		req, err := NewRequest(s.conn, addr, buf[:n])
+		if err != nil {
+			s.HandleFormattingError(&Request{
+				msg:  &message.Message{},
+				conn: s.conn,
+				addr: addr,
+			})
+			continue
+		}
 
 		go s.HandleRequest(req)
 
@@ -81,6 +116,6 @@ func (s *Server) Close() {
 	err := s.conn.Close()
 	if err != nil {
 		slog.Error("failed to close server", "err", err.Error())
-		panic("Failed to close connection to server")
+		panic("failed to close connection to server")
 	}
 }
